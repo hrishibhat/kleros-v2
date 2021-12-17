@@ -16,8 +16,8 @@
 pragma solidity ^0.8;
 
 // TODO: standard interfaces should be placed in a separated repo (?)
-import "./IEvidence.sol";
-import "../arbitration/IArbitrator.sol";
+import "../standard/IEvidence.sol";
+import "../standard/IArbitrator.sol";
 
 contract EvidenceModule is IEvidence {
     IArbitrator private constant NULL_ARBITRATOR = IArbitrator(address(0x0));

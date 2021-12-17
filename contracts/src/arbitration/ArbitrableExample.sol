@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8;
 
-import "./IArbitrable.sol";
+import "../api/AbstractArbitrable.sol";
 
 /**
  *  @title ArbitrableExample
  *  An example of the arbitrable contract which connects to the arbitator that implements IArbitrator interface.
  */
-contract ArbitrableExample is IArbitrable {
+contract ArbitrableExample is AbstractArbitrable {
     struct DisputeStruct {
         bool isRuled; // Whether the dispute has been ruled or not.
         uint256 ruling; // Ruling given by the arbitrator.

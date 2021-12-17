@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8;
 
-import "./IArbitrator.sol";
+import "../api/AbstractArbitrator.sol";
 
 /** @title Centralized Arbitrator
  *  @dev This is a centralized arbitrator deciding alone on the result of disputes. It illustrates how IArbitrator interface can be implemented.
  *  Note that this contract supports appeals. The ruling given by the arbitrator can be appealed by crowdfunding a desired choice.
  */
-contract CentralizedArbitrator is IArbitrator {
+contract CentralizedArbitrator is AbstractArbitrator {
     /* Constants */
 
     // The required fee stake that a party must pay depends on who won the previous round and is proportional to the appeal cost such that the fee stake for a round is stake multiplier * appeal cost for that round.

@@ -16,9 +16,8 @@
 pragma solidity ^0.8;
 
 // TODO: standard interfaces should be placed in a separated repo (?)
-import "../arbitration/IArbitrable.sol";
-import "../arbitration/IArbitrator.sol";
-import "./IEvidence.sol";
+import "../standard/IEvidence.sol";
+import "../standard/IArbitrator.sol";
 import "../libraries/CappedMath.sol";
 
 contract ModeratedEvidenceModule is IArbitrable, IEvidence {
