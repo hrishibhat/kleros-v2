@@ -142,7 +142,7 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
         require(claim.claimedAt + challengeDuration < block.timestamp, "Challenge period not over");
         require((claim.honest == true) || (challenge.challenger == address(0)), "Claim not proven.");
         bytes32 messageHash = keccak256(_encodedData);
-        bytes32 uniqueMessageID = keccak256(abi.encode(proof, index, messageHash, _merkleRootStampedHash));
+        bytes32 uniqueMessageID = keccak256(abi.encode(proof, index, messageHash));
         require(relayed[uniqueMessageID] == false, "Message already relayed");
 
         bytes32 merkleRoot = proof.calculateRoot(index, messageHash);
