@@ -126,38 +126,12 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
     function _sendBatch() internal {
         bytes32 merkleRoot = merkleHistory.get_deposit_root();
         merkleHistory.reset();
+        
         bytes memory merkleRootStamped = abi.encode(merkleRoot, block.number);
         bytes32 merkleRootStampedHash = keccak256(merkleRootStamped);
-
+        registered[merkleRootStampedHash] = true;
+        
         emit OutgoingMessageBatch(block.number, merkleRootStampedHash, merkleRoot);
-    }
-
-    /**
-     * Sends an individual arbitrary message from one domain to another
-     * via the safe bridge mechanism, which relies on the chain's native bridge.
-     *
-     * It is unnecessary during normal operations but an optional feature.
-     * It is useful in edgecases when the merkle root is relayed, but goes stale
-     * to prevent mining of old merkle roots, and the message was not relayed
-     * while the merkle root was active.
-     *
-     * It may require some ETH (or whichever native token) to pay for the bridging cost,
-     * depending on the underlying safe bridge.
-     *
-     * @param _receiver The L1 contract address who will receive the calldata
-     * @param _calldata The receiving domain encoded message data.
-     */
-    function sendSafeMessageFallback(address _receiver, bytes memory _calldata) external payable {
-        bytes memory messageData = abi.encode(_receiver, _calldata);
-        bytes32 messageHash = keccak256(messageData);
-        require(registered[messageHash], "Message not registered");
-
-        // Safe Bridge message envelope
-        bytes4 methodSelector = IFastBridgeReceiver.verifySafe.selector;
-        bytes memory safeMessageData = abi.encodeWithSelector(methodSelector, messageData);
-
-        // TODO: how much ETH should be provided for bridging? add an ISafeBridgeSender.bridgingCost() if needed
-        _sendSafe(address(fastBridgeReceiver), safeMessageData);
     }
 
     /**
@@ -171,14 +145,11 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
      *
      * @param _merkleRoot The merkle root corresponding to a batch of messages.
      */
-    function sendSafeFallback(bytes32 _merkleRoot) override external payable {
-        bool isValid = false;
-        if(registered[_merkleRoot])
-            isValid = true;
-
+    function sendSafeFallback(bytes32 _merkleRootStampedHash) override external payable {
+    
         // Safe Bridge message envelope
         bytes4 methodSelector = IFastBridgeReceiver.verifySafe.selector;
-        bytes memory safeMessageData = abi.encodeWithSelector(methodSelector, _merkleRoot, isValid);
+        bytes memory safeMessageData = abi.encodeWithSelector(methodSelector, _merkleRootStampedHash, registered[_merkleRootStampedHash]);
 
         // TODO: how much ETH should be provided for bridging? add an ISafeBridgeSender.bridgingCost() if needed
         _sendSafe(address(fastBridgeReceiver), safeMessageData);
