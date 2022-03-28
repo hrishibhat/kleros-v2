@@ -143,7 +143,7 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
      * It may require some ETH (or whichever native token) to pay for the bridging cost,
      * depending on the underlying safe bridge.
      *
-     * @param _merkleRoot The merkle root corresponding to a batch of messages.
+     * @param _merkleRootStampedHash The merkle root 'stamped' (hashed) with a blocknumber corresponding to a batch of messages.
      */
     function sendSafeFallback(bytes32 _merkleRootStampedHash) override external payable {
     
