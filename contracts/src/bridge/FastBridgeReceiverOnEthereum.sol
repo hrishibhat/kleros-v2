@@ -145,7 +145,7 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
         bytes32 uniqueMessageID = keccak256(abi.encode(proof, index, messageHash));
         require(relayed[uniqueMessageID] == false, "Message already relayed");
 
-        bytes32 merkleRoot = proof.calculateRoot(index, messageHash);
+        bytes32 merkleRoot = calculateRoot(proof, index, messageHash);
         require(_merkleRootStampedHash == keccak256(abi.encode(merkleRoot,blocknumberStamp)), "Invalid proof.");
 
 
@@ -156,9 +156,17 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
 
         relayed[uniqueMessageID] = true;
     }
-
-    function calculateRoot(bytes32[] memory _proof, uint256 _index, bytes32 _messageHash) public pure returns (bytes32){
-        return _proof.calculateRoot(_index, _messageHash);
+    /**
+     * Calculates merkle root from proof
+     *
+     * Useful for testing to expose this function
+     *
+     * @param _proof The proof path of siblings to hash together with the leaf to calculate the merkle root.
+     * @param _index The index of the leaf.
+     * @param _leaf  The leaf whose membership in the merkle tree is proven by Proof 
+     */
+    function calculateRoot(bytes32[] memory _proof, uint256 _index, bytes32 _leaf) public pure returns (bytes32){
+        return _proof.calculateRoot(_index, _leaf);
     }
 
     /**

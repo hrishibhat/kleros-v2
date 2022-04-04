@@ -2,7 +2,7 @@
 
 // https://github.com/OffchainLabs/arbitrum/blob/master/packages/arb-bridge-eth/contracts/libraries/MerkleLib.sol
 // Upgraded Pragma Version ^0.6.11 -> ^0.8.0
-
+// Swapped the leaf order convention in line 52 for consistency with MerkleHistory.sol
 /*
  * Copyright 2019-2021, Offchain Labs, Inc.
  *
