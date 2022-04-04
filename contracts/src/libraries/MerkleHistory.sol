@@ -84,7 +84,7 @@ contract MerkleHistory is IDepositContract, ERC165 {
         fastBridge = _fastBridge;
         // Compute hashes in empty sparse Merkle tree
         for (uint height = 0; height < depositContractTreeDepth - 1; height++)
-            zero_hashes[height + 1] = sha256(abi.encodePacked(zero_hashes[height], zero_hashes[height]));
+            zero_hashes[height + 1] = keccak256(abi.encodePacked(zero_hashes[height], zero_hashes[height]));
     }
 
     // ************************************* //
@@ -97,9 +97,9 @@ contract MerkleHistory is IDepositContract, ERC165 {
         uint size = depositCount;
         for (uint height = 0; height < depositContractTreeDepth; height++) {
             if ((size & 1) == 1)
-                node = sha256(abi.encodePacked(branch[height], node));
+                node = keccak256(abi.encodePacked(branch[height], node));
             else
-                node = sha256(abi.encodePacked(node, zero_hashes[height]));
+                node = keccak256(abi.encodePacked(node, zero_hashes[height]));
             size /= 2;
         }
         return node;
@@ -129,7 +129,7 @@ contract MerkleHistory is IDepositContract, ERC165 {
                 branch[height] = message;
                 return true;
             }
-            message = sha256(abi.encodePacked(branch[height], message));
+            message = keccak256(abi.encodePacked(branch[height], message));
             size /= 2;
         }
 

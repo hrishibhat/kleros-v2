@@ -157,6 +157,10 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
         relayed[uniqueMessageID] = true;
     }
 
+    function calculateRoot(bytes32[] memory _proof, uint256 _index, bytes32 _messageHash) public pure returns (bytes32){
+        return _proof.calculateRoot(_index, _messageHash);
+    }
+
     /**
      * Receives a validity boolean and merkle root which represents arbitrary 
      * messages from fast bridge sender via the safe bridge mechanism, 
