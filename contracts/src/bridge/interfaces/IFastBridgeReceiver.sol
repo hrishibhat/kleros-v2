@@ -19,6 +19,8 @@ interface IFastBridgeReceiver {
         bytes calldata _messageData
     ) external;
 
+    function ignoreClaim(uint256 _ticketID) external;
+
     function withdrawClaimDeposit(uint256 _ticketID) external;
 
     function withdrawChallengeDeposit(uint256 _ticketID) external;

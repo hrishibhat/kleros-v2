@@ -148,6 +148,12 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
         require(_relay(_messageData), "Failed to call contract"); // Checks-Effects-Interaction
     }
 
+    function ignoreClaim(uint256 _ticketID) external override {
+        require(isSentBySafeBridge(), "Access not allowed: SafeBridgeSender only.");
+
+        delete tickets[_ticketID]; // nobody gets rewarded for this and the Claimant loses his deposit
+    }
+
     function withdrawClaimDeposit(uint256 _ticketID) external override {
         Ticket storage ticket = tickets[_ticketID];
         require(ticket.relayed == true, "Message not relayed yet");

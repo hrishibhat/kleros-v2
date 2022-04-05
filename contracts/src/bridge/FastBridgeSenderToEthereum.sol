@@ -107,7 +107,7 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
      * @param _receiver The L1 contract address who will receive the calldata
      * @param _calldata The receiving domain encoded message data.
      */
-    function sendSafeFallback(
+    function sendSafeTicket(
         uint256 _ticketID,
         address _receiver,
         bytes memory _calldata
@@ -127,6 +127,18 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
             ticket.blockNumber,
             messageData
         );
+
+        // TODO: how much ETH should be provided for bridging? add an ISafeBridgeSender.bridgingCost() if needed
+        _sendSafe(address(fastBridgeReceiver), safeMessageData);
+    }
+
+    function sendSafeNullTicket(uint256 _ticketID) external payable override {
+        Ticket storage ticket = tickets[_ticketID];
+        require(ticket.messageHash == 0, "Ticket does exist.");
+
+        // Safe Bridge message envelope
+        bytes4 methodSelector = IFastBridgeReceiver.ignoreClaim.selector;
+        bytes memory safeMessageData = abi.encodeWithSelector(methodSelector, _ticketID);
 
         // TODO: how much ETH should be provided for bridging? add an ISafeBridgeSender.bridgingCost() if needed
         _sendSafe(address(fastBridgeReceiver), safeMessageData);
