@@ -23,6 +23,6 @@ interface IFastBridgeReceiver {
 
     function claimPeriod() external view returns (uint256 amount);
 
-    function expirationTime() external view returns (uint256 amount);
+    function expiration() external view returns (uint256 amount);
 
 }

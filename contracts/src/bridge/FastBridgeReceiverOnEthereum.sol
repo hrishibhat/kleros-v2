@@ -45,15 +45,16 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
     uint256 public override claimDeposit;
     uint256 public override challengeDeposit;
     uint256 public override challengeDuration;
-    uint256 public override expirationTime;              // avoids mining old merkle roots. e.g. ~ 1 month
-    uint256 public override claimPeriod;                 // should be <= minBatchTime
+    uint256 public expiration;                  // avoids mining old merkle roots. e.g. ~ 1 month [in blocks, roughly ~15 sec / block]
+    uint256 public override claimPeriod;        // should be < minBatchTime
+    uint256 public treeDepth;
     uint256 public timeClaimPeriodSet;          // time to start claim count
-    uint256 public claimAllowance;              // memory when claimPeriod is reset
+    uint256 public claimAllowance;              // history of claim allowance when claimPeriod is reset
     uint256 public totalClaims;
-    mapping(bytes32 => Claim) public claims; // merkleRoot => claim
+    mapping(bytes32 => Claim) public claims;    // merkleRoot => claim
     mapping(bytes32 => Challenge) public challenges; // merkleRoot => challenge
 
-    mapping(bytes32 => bool) public relayed; //  uniqueMessageID => relayed
+    mapping(bytes32 => bool) public relayed;    // uniqueMessageID => relayed
 
     // ************************************* //
     // *              Events               * //
@@ -70,16 +71,17 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
         uint256 _claimDeposit,
         uint256 _challengeDeposit,
         uint256 _challengeDuration,
-        uint256 _expirationTime,
-        uint256 _claimPeriod
+        uint256 _claimPeriod,
+        uint256 _treedepth
     ) SafeBridgeReceiverOnEthereum(_governor, _safeBridgeSender, _inbox) {
         claimDeposit = _claimDeposit;
         challengeDeposit = _challengeDeposit;
         challengeDuration = _challengeDuration;
-        expirationTime = _expirationTime;
+        expiration = 172800; // 1 month / (15 sec / block)
         claimPeriod = _claimPeriod;
         timeClaimPeriodSet = block.timestamp;
         totalClaims = 0;
+        treeDepth = _treedepth;
     }
 
     // ************************************* //
@@ -133,28 +135,29 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
      *
      * @param _encodedData The data encoding receiver, function selector, and calldata
      */
-    function verifyAndRelay(bytes32 _merkleRootStampedHash, uint256 blocknumberStamp, bytes32[] memory proof, uint256 index, bytes memory _encodedData) external override{
+    function verifyAndRelay(bytes32 _merkleRootStampedHash, uint256 _blocknumberStamp, bytes32[] memory proof, uint256 index, bytes memory _encodedData) external override{
         Claim storage claim = claims[_merkleRootStampedHash];
         Challenge storage challenge = challenges[_merkleRootStampedHash];
 
         require(claim.bridger != address(0), "Claim does not exist");
-        require(block.timestamp - claim.claimedAt < challengeDuration + expirationTime, "Merkle Root is stale.");
-        require(claim.claimedAt + challengeDuration < block.timestamp, "Challenge period not over");
+        require(_blocknumberStamp < expiration, "Merkle Root is stale.");
+        require( challengeDuration < block.timestamp - claim.claimedAt, "Challenge period not over");
         require((claim.honest == true) || (challenge.challenger == address(0)), "Claim not proven.");
         bytes32 messageHash = keccak256(_encodedData);
-        bytes32 uniqueMessageID = keccak256(abi.encode(proof, index, messageHash));
+        bytes32 uniqueMessageID = keccak256(abi.encode(_merkleRootStampedHash, index));
         require(relayed[uniqueMessageID] == false, "Message already relayed");
 
+        require(proof.length == treeDepth, "Invalid Proof Length");
         bytes32 merkleRoot = calculateRoot(proof, index, messageHash);
-        require(_merkleRootStampedHash == keccak256(abi.encode(merkleRoot,blocknumberStamp)), "Invalid proof.");
+        require(_merkleRootStampedHash == keccak256(abi.encode(merkleRoot,_blocknumberStamp)), "Invalid proof.");
 
+        relayed[uniqueMessageID] = true;
 
         // Decode the receiver address from the data encoded by the IFastBridgeSender
         (address receiver, bytes memory data) = abi.decode(_encodedData, (address, bytes));
         (bool success, ) = address(receiver).call(data);
         require(success, "Failed to call contract");
 
-        relayed[uniqueMessageID] = true;
     }
     /**
      * Calculates merkle root from proof
@@ -169,6 +172,11 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
         return _proof.calculateRoot(_index, _leaf);
     }
 
+    function setTreeDepth(uint256 _treeDepth) external onlyByGovernor{
+        require(_treeDepth <= 32, "Tree too deep.");
+        treeDepth = _treeDepth;
+    }
+
     /**
      * Receives a validity boolean and merkle root which represents arbitrary 
      * messages from fast bridge sender via the safe bridge mechanism, 
@@ -179,15 +187,15 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
      * If invalid, any challenge is proven honest.
      *
      * @param _merkleRootStampedHash The merkleRootStampedHash requested for validation by safe bridge
-     * @param _isValid The validity of _merkleRootStampedHash.
+     * @param _registered The validity of _merkleRootStampedHash.
      */
-    function verifySafe(bytes32 _merkleRootStampedHash, bool _isValid) override external {
+    function verifySafe(bytes32 _merkleRootStampedHash, bool _registered) override external {
         require(isSentBySafeBridge(), "Access not allowed: SafeBridgeSender only.");
 
         Challenge storage challenge = challenges[_merkleRootStampedHash];
         Claim storage claim = claims[_merkleRootStampedHash];
 
-        if(_isValid == true){
+        if(_registered == true){
             claim.honest = true;
             if(claim.bridger == address(0)){
                 // no claim, set as safe bridge
@@ -214,12 +222,15 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
     }
 
     function withdrawChallengeDeposit(bytes32 _merkleRootStampedHash) external override {
+        Claim storage claim = claims[_merkleRootStampedHash];
         Challenge storage challenge = challenges[_merkleRootStampedHash];
         require(challenge.challenger != address(0), "Challenge does not exist");
         require(challenge.honest == true, "Challenge not proven.");
-        uint256 amount = challenge.challengeDeposit + claims[_merkleRootStampedHash].claimDeposit;
+        // only reward half of the claim deposit
+        // prevent zero cost delay grief by dishonest claim -> self challenge
+        uint256 amount = challenge.challengeDeposit + claim.claimDeposit/2;
         challenge.challengeDeposit = 0;
-        claims[_merkleRootStampedHash].claimDeposit = 0;
+        claim.claimDeposit = 0;
         payable(challenge.challenger).send(amount);
     }
 
@@ -258,7 +269,7 @@ contract FastBridgeReceiverOnEthereum is SafeBridgeReceiverOnEthereum, IFastBrid
         timeClaimPeriodSet = block.timestamp;
     }
 
-    function setExpirationTime(uint256 _expirationTime) external onlyByGovernor {
-        expirationTime = _expirationTime;
+    function setExpiration(uint256 _expiration) external onlyByGovernor {
+        expiration = _expiration;
     }
 }

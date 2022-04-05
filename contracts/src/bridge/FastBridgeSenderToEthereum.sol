@@ -30,6 +30,7 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
     address public fastSender;
     uint256 public minBatchTime;
     uint256 public lastBatchTime;
+    uint256 public expiration;     // avoids mining old merkle roots. e.g. ~ 1 month [in blocks, roughly ~15 sec / block]
     MerkleHistory public merkleHistory;
     mapping (bytes32 => bool) internal registered;
 
@@ -54,8 +55,8 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
      */
     event OutgoingMessageBatch(uint256 indexed blockNumber, bytes32 merkleRootStamped, bytes32 merkleRoot);
     /**
-     * The bridgers need to watch for these events and relay the 
-     * stamped merkleRoot on the FastBridgeReceiverOnEthereum.
+     * The off-chain proof construction code will need to update
+     * it's depth parameter to pass valid merkle proofs to the FastBridgeReceiverOnEthereum.
      */
     event TreeDepthChange(uint256 newTreeDepth);
 
@@ -68,11 +69,12 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
         _;
     }
 
-    constructor(address _governor, uint256 _minBatchTime) SafeBridgeSenderToEthereum() {
+    constructor(address _governor, uint256 _minBatchTime, uint256 _treedepth) SafeBridgeSenderToEthereum() {
         governor = _governor;
-        merkleHistory = new MerkleHistory(_governor, address(this));
+        merkleHistory = new MerkleHistory(_governor, address(this), _treedepth);
         minBatchTime = _minBatchTime;
         lastBatchTime = block.timestamp;
+        expiration = 172800; // 1 month / (15 sec / block)
     }
 
     // ************************************* //
@@ -96,41 +98,70 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
 
         bool success = merkleHistory.deposit(messageHash);
         if (success == false){
-            // merkleTree is full, default capacity is 2**16-1 = 65535 messages
+            // merkleTree is full, default capacity is 2**16 = 65536 messages
             // governance should expand the size by calling setDepositContractTreeDepth(uint256)
+            // fixed depth prevents second pre-image attack
+            // https://flawed.net.nz/2018/02/21/attacking-merkle-trees-with-a-second-preimage-attack/
             _sendBatch();
             merkleHistory.deposit(messageHash);
         }
 
         emit ReceivedMessage(_receiver, messageHash, messageData, merkleHistory.depositCount());
 
-        if(minBatchTime < block.timestamp + lastBatchTime){
+        if(minBatchTime < block.timestamp - lastBatchTime){
             _sendBatch();
         }
     }
 
     /**
-     * Sends an arbitrary message from one domain to another
-     * via the fast bridge mechanism
-     *
+     * Sends a batch of arbitrary message from one domain to another
+     * via the fast bridge mechanism.
      */
     function sendBatch() public {
-        require(minBatchTime < block.timestamp + lastBatchTime, "minBatchTime not elapsed.");
+        require(minBatchTime < block.timestamp - lastBatchTime, "minBatchTime not elapsed.");
         _sendBatch();
     }
 
+    /**
+     * Returns deposit count in current batch of messages.
+     */
     function getDepositCount() public view returns (uint256){
         return merkleHistory.depositCount();
     }
 
+    /**
+     * Sends a batch of arbitrary message from one domain to another
+     * via the fast bridge mechanism.
+     */
     function _sendBatch() internal {
         bytes32 merkleRoot = merkleHistory.get_deposit_root();
         merkleHistory.reset();
+        lastBatchTime = block.timestamp;
         
         bytes memory merkleRootStamped = abi.encode(merkleRoot, block.number);
         bytes32 merkleRootStampedHash = keccak256(merkleRootStamped);
         registered[merkleRootStampedHash] = true;
         
+        emit OutgoingMessageBatch(block.number, merkleRootStampedHash, merkleRoot);
+    }
+
+    /**
+     * Refreshes stale Merkle Root.
+     * @param _blocknumber block number of old merkle root to refresh
+     */
+    function sendRefresh(uint256 _blocknumber) external {
+
+        bytes32 merkleRoot = merkleHistory.get_deposit_root(_blocknumber);
+        require(merkleRoot != bytes32(0), "No history for requested block number.");
+        require(block.number - _blocknumber > expiration, "Merkle root is still fresh.");
+        // avoids any possible collision with block.number used in _sendBatch()
+        require(minBatchTime > block.timestamp - lastBatchTime, "minBatchTime not elapsed.");
+        // optionally limit the number of refresh requests
+        // maybe only allow on refresh request after minimum of 10 * minBatchTime 
+        bytes memory merkleRootStamped = abi.encode(merkleRoot, block.number);
+        bytes32 merkleRootStampedHash = keccak256(merkleRootStamped);
+        registered[merkleRootStampedHash] = true;
+
         emit OutgoingMessageBatch(block.number, merkleRootStampedHash, merkleRoot);
     }
 
@@ -170,6 +201,10 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
     }
 
     function setMinBatchTime(uint256 _minBatchTime) external onlyByGovernor {
+        minBatchTime = _minBatchTime;
+    }
+
+    function setExpiration(uint256 _minBatchTime) external onlyByGovernor {
         minBatchTime = _minBatchTime;
     }
 

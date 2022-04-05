@@ -7,7 +7,11 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃┃━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┗┛━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// slight modification by @shotaronowhere
+// Modified from:
+// https://github.com/ethereum/consensus-specs/blob/master/solidity_deposit_contract/deposit_contract.sol
+// https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/deposit-contract.md
+// Modification by @shotaronowhere
+// Modified to maintain history of merkle roots and support simple bytes32 message hashes as leaves
 
 // SPDX-License-Identifier: CC0-1.0
 
@@ -54,9 +58,8 @@ interface ERC165 {
 /// @notice This is the Ethereum 2.0 deposit contract interface.
 /// For more information see the Phase 0 specification under https://github.com/ethereum/eth2.0-specs
 contract MerkleHistory is IDepositContract, ERC165 {
-    uint256 public depositContractTreeDepth = 16;
-    // NOTE: this also ensures `deposit_count` will fit into 64-bits
-    uint256 public maxDepositCount = 2**depositContractTreeDepth - 1;
+    uint256 public depositContractTreeDepth;
+    uint256 public maxDepositCount;
 
     bytes32[32] internal branch;
     // blocknumber => merkleRoot
@@ -79,11 +82,14 @@ contract MerkleHistory is IDepositContract, ERC165 {
         require(fastBridge == msg.sender, "Access not allowed: Governor only.");
         _;
     }
-    constructor(address _governor, address _fastBridge) {
+    constructor(address _governor, address _fastBridge, uint256 _treeDepth) {
         governor = _governor;
         fastBridge = _fastBridge;
+        require(_treeDepth <= 32, "Tree too deep.");
+        depositContractTreeDepth = _treeDepth;
+        maxDepositCount = 2**depositContractTreeDepth - 1;
         // Compute hashes in empty sparse Merkle tree
-        for (uint height = 0; height < depositContractTreeDepth - 1; height++)
+        for (uint height = 0; height <  31; height++)
             zero_hashes[height + 1] = keccak256(abi.encodePacked(zero_hashes[height], zero_hashes[height]));
     }
 
