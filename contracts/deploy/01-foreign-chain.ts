@@ -15,16 +15,22 @@ const paramsByChainId = {
     claimDeposit: parseEther("0.1"),
     challengeDuration: 86400, // 1 day
     homeChainId: 42161,
+    claimPeriod: 43200, // 1/2 day -> 2 claims per day
+    treedepth: 16 // supports 2**16 messages per batch
   },
   4: {
     claimDeposit: parseEther("0.1"),
     challengeDuration: 120, // 2 min
     homeChainId: 421611,
+    claimPeriod: 43200, // 1/2 day -> 2 claims per day
+    treedepth: 16 // supports 2**16 messages per batch
   },
   31337: {
     claimDeposit: parseEther("0.1"),
     challengeDuration: 120, // 2 min
     homeChainId: 31337,
+    claimPeriod: 43200, // 1/2 day -> 2 claims per day
+    treedepth: 16 // supports 2**16 messages per batch
   },
 };
 
@@ -56,7 +62,7 @@ const deployForeignGateway: DeployFunction = async (hre: HardhatRuntimeEnvironme
     nonce = await homeChainProvider.getTransactionCount(deployer);
     nonce += 1; // HomeGatewayToEthereum deploy tx will the third tx after this on its home network, so we add two to the current nonce.
   }
-  const { claimDeposit, challengeDuration, homeChainId } = paramsByChainId[chainId];
+  const { claimDeposit, challengeDuration, claimPeriod, treedepth, homeChainId } = paramsByChainId[chainId];
   const challengeDeposit = claimDeposit;
   const homeChainIdAsBytes32 = hexZeroPad(homeChainId, 32);
 
@@ -72,6 +78,8 @@ const deployForeignGateway: DeployFunction = async (hre: HardhatRuntimeEnvironme
       claimDeposit,
       challengeDeposit,
       challengeDuration,
+      claimPeriod,
+      treedepth
     ],
     log: true,
   });

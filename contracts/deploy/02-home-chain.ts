@@ -20,9 +20,16 @@ const deployHomeGateway: DeployFunction = async (hre: HardhatRuntimeEnvironment)
     chainId === 31337
       ? await deployments.get("FastBridgeReceiverOnEthereum")
       : await hre.companionNetworks.foreign.deployments.get("FastBridgeReceiverOnEthereum");
+  const minBatchTime = 86400 // 1 day
+  const treedepth = 16 // supports 2**16 messages
   const fastBridgeSender = await deploy("FastBridgeSenderToEthereum", {
     from: deployer,
-    args: [deployer, fastBridgeReceiver.address],
+    args: [
+      deployer, 
+      fastBridgeReceiver.address,
+      minBatchTime,
+      treedepth
+    ],
     log: true,
   }); // nonce+0
 
