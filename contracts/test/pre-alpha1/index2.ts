@@ -1,4 +1,5 @@
-// Only claim, no challenge. honest claimer. 
+//challenged- dishonest challenger
+
 import { expect } from "chai";
 import { deployments, ethers, getNamedAccounts, network } from "hardhat";
 import { BigNumber } from "ethers";
@@ -11,9 +12,10 @@ import {
   ArbitrableExample,
   FastBridgeSenderToEthereum,
   HomeGatewayToEthereum,
+  ArbSys,
+  Inbox
 } from "../../typechain-types";
 import { OutgoingMessage } from "http";
-import { Provider } from "@ethersproject/abstract-provider";
 
 /* eslint-disable no-unused-vars */
 
@@ -32,7 +34,7 @@ describe("Demo pre-alpha1", function () {
   }
 
   let deployer, relayer, bridger, challenger, innocentBystander;
-  let ng, disputeKit, pnk, core, fastBridgeReceiver, foreignGateway, arbitrable, fastBridgeSender, homeGateway;
+  let ng, disputeKit, pnk, core, fastBridgeReceiver, foreignGateway, arbitrable, fastBridgeSender, homeGateway, safeBridgeArb, safeBridgeEth, arbsys, inbox;
 
   before("Setup", async () => {
     deployer = (await getNamedAccounts()).deployer;
@@ -55,6 +57,9 @@ describe("Demo pre-alpha1", function () {
     arbitrable = <ArbitrableExample>await ethers.getContract("ArbitrableExample");
     fastBridgeSender = <FastBridgeSenderToEthereum>await ethers.getContract("FastBridgeSenderToEthereum");
     homeGateway = <HomeGatewayToEthereum>await ethers.getContract("HomeGatewayToEthereum");
+    arbsys = <ArbSys>await ethers.getContract("ArbSys");
+    inbox = <Inbox>await ethers.getContract("Inbox");
+    // safeBridgeEth = <SafeBridgeReceiverOnEthereum>await ethers.getContract("SafeBridgeReceiverOnEthereum");
   });
 
   it("RNG", async () => {
@@ -70,7 +75,7 @@ describe("Demo pre-alpha1", function () {
     expect(rn).to.equal(rnOld.add(1));
   });
 
-  it("Demo - Honest Claim - No Challenge", async () => {
+  it("Demo - Honest Claim - Challenged", async () => {
     const arbitrationCost = ONE_TENTH_ETH.mul(3);
     const [bridger, challenger] = await ethers.getSigners();
 
@@ -111,25 +116,14 @@ describe("Demo pre-alpha1", function () {
     expect(tx).to.emit(foreignGateway, "OutgoingDispute"); //.withArgs(disputeId, deployer.address);
     console.log(`disputeId: ${disputeId}`);
 
+    let events = await foreignGateway.queryFilter(OutgoingMessage);
+
+
     const lastBlock = await ethers.provider.getBlock(tx.blockNumber - 1);
     const disputeHash = ethers.utils.solidityKeccak256(
       ["uint", "bytes", "bytes", "uint", "uint", "bytes", "address"],
       [31337, lastBlock.hash, ethers.utils.toUtf8Bytes("createDispute"), disputeId, 2, "0x00", arbitrable.address]
     );
-
-    const events = (await tx.wait()).events;
-
-    // expect(events[0].event).to.equal("OutgoingDispute");
-    // expect(events[0].args.disputeHash).to.equal(disputeHash);
-    // expect(events[0].args.blockhash).to.equal(lastBlock.hash);
-    // expect(events[0].args.localDisputeID).to.equal(disputeId);
-    // expect(events[0].args._choices).to.equal(2);
-    // expect(events[0].args._extraData).to.equal("0x00");
-    // expect(events[0].args.arbitrable).to.equal(deployer);
-
-    // expect(events[1].event).to.equal("DisputeCreation");
-    // expect(events[1].args._arbitrable).to.equal(deployer);
-    // expect(events[1].args._disputeID).to.equal(disputeId);
 
     // Relayer tx
     const tx2 = await homeGateway
@@ -165,11 +159,12 @@ describe("Demo pre-alpha1", function () {
     let ticket1 = await fastBridgeSender.currentTicketID();
     expect(ticket1).to.equal(1);
 
+
     const tx4 = await core.executeRuling(0);
     expect(tx4).to.emit(fastBridgeSender, "OutgoingMessage");
 
     let event4 = await fastBridgeSender.queryFilter(OutgoingMessage);
-    // console.log(event4[0].args); // @note : here we get the sendFast outgoing message
+    let message = event4[0].args[4];  // @note : here we get the sendFast outgoing message 
     console.log("Executed ruling");
 
     let ticket2 = await fastBridgeSender.currentTicketID();
@@ -179,32 +174,56 @@ describe("Demo pre-alpha1", function () {
     const messageHash = event4[0].args.messageHash;
     const blockNumber = event4[0].args.blockNumber;
     const messageData = event4[0].args.message;
-  
-    let bridgerBalance = await ethers.provider.getBalance(bridger.address);
-    console.log("Bridger Balance: %s",bridgerBalance.toString());
-    //bridger tx @note bridger tx starts - Honest Bridger 
+    
+
+    //bridger tx @note bridger tx starts
     const tx5 = await fastBridgeReceiver.connect(bridger).claim(ticketID, messageHash, {value : ONE_TENTH_ETH});
     let blockNumBefore = await ethers.provider.getBlockNumber();
     let blockBefore = await ethers.provider.getBlock(blockNumBefore);
     let timestampBefore = blockBefore.timestamp;
     expect(tx5).to.emit(fastBridgeReceiver,"ClaimReceived").withArgs(ticketID, messageHash, timestampBefore);
 
+    //Challenger tx @note Challenger tx starts
+    const tx6 = await fastBridgeReceiver.connect(challenger).challenge(ticketID, {value : ONE_TENTH_ETH});
+     blockNumBefore = await ethers.provider.getBlockNumber();
+     blockBefore = await ethers.provider.getBlock(blockNumBefore);
+     timestampBefore = blockBefore.timestamp;
+
+    console.log(ticketID, blockNumber.toNumber(), blockNumBefore, timestampBefore);
+
+    expect(tx6).to.emit(fastBridgeReceiver,"ClaimChallenged").withArgs(ticketID, timestampBefore);
+    const events6 = (await tx6.wait()).events;
+    console.log(events6[0].args.ticketID.toNumber());
+    console.log(events6[0].args.challengedAt.toNumber());
      
     //wait for challenge period to pass
     await network.provider.send("evm_increaseTime", [300]);
     await network.provider.send("evm_mine");    
-  
     
-    // let currentRuling = await core.currentRuling(0);
-    const tx7 = await fastBridgeReceiver.connect(bridger).verifyAndRelay(ticketID, blockNumber, messageData);
+
+    await expect(fastBridgeReceiver.connect(bridger).verifyAndRelay(ticketID, blockNumber, messageData)).to.be.revertedWith('Claim is challenged');
+
+    await fastBridgeSender.set_arb(arbsys.address);
+
+    let data = await ethers.utils.defaultAbiCoder.decode(["address", "bytes"], message);
+    let tx7 = await fastBridgeSender.connect(bridger).sendSafeFallback(ticketID, foreignGateway.address, data[1],  { gasLimit: 1000000}
+);
+    expect(tx7).to.emit(fastBridgeSender, "L2ToL1TxCreated");
     expect(tx7).to.emit(arbitrable, "Ruling");
+    console.log("ticketID is: %d", ticketID);
+
+    // let bridgerBalance = await ethers.provider.getBalance(bridger.address);
+    // console.log("Bridger Balance: %s",bridgerBalance.toString());
 
     const tx8 = await fastBridgeReceiver.withdrawClaimDeposit(ticketID);
 
-  });
-  
-});
 
+
+    // const tx8 = await fastBridgeReceiver.withdrawChallengeDeposit(ticketID);
+    await expect(fastBridgeReceiver.withdrawChallengeDeposit(ticketID)).to.be.revertedWith('Claim verified: deposit forfeited');
+     
+  });
+});
 
 const logJurorBalance = function (result) {
   console.log("staked=%s, locked=%s", ethers.utils.formatUnits(result.staked), ethers.utils.formatUnits(result.locked));

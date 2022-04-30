@@ -86,6 +86,10 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
         tickets[ticketID] = Ticket({messageHash: messageHash, blockNumber: block.number, sentSafe: false});
     }
 
+    function set_arb(address _arbsys) external {
+        _setarb(_arbsys);
+    }
+
     /**
      * @dev Sends an arbitrary message to Ethereum using the Safe Bridge, which relies on Arbitrum's canonical bridge. It is unnecessary during normal operations but essential only in case of challenge.
      * @param _ticketID The ticketID as returned by `sendFast()`.

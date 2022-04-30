@@ -44,6 +44,25 @@ const deployHomeGateway: DeployFunction = async (hre: HardhatRuntimeEnvironment)
   if (fastSender === ethers.constants.AddressZero) {
     await execute("FastBridgeSenderToEthereum", { from: deployer, log: true }, "changeFastSender", homeGateway.address);
   }
+
+  const outbox = await deploy("Outbox", {
+    from: deployer,
+    args: [fastBridgeSender.address],
+    log: true,
+  });
+
+  const bridge = await deploy("Bridge", {
+    from: deployer,
+    args: [outbox.address],
+    log: true,
+  });
+
+  const inbox = await deploy("Inbox", {
+    from: deployer,
+    args: [bridge.address],
+    log: true,
+  });
+
 };
 
 deployHomeGateway.tags = ["HomeChain", "HomeGateway"];
