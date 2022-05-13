@@ -176,6 +176,9 @@ tags
 # Support for Project snippet scope
 !.vscode/*.code-snippets
 
+# DS_Store
+*.DS_Store
+
 ### yarn ###
 # https://yarnpkg.com/advanced/qa#which-files-should-be-gitignored
 

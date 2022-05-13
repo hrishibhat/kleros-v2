@@ -14,7 +14,6 @@ import "./interfaces/arbitrum/IArbSys.sol";
 import "./interfaces/arbitrum/AddressAliasHelper.sol";
 
 import "./interfaces/ISafeBridgeSender.sol";
-import "hardhat/console.sol";
 
 /**
  * Safe Bridge Sender to Ethereum from Arbitrum
@@ -41,15 +40,13 @@ contract SafeBridgeSenderToEthereum is ISafeBridgeSender {
     // ************************************* //
     // *        Function Modifiers         * //
     // ************************************* //
-    function _setarb(address _arbsys) internal {
+    function set_arb(address _arbsys) external {
         arbsys = IArbSys(address(_arbsys));
         // ARB_SYS= IArbSys(address(arbsys));
     }
 
     function _sendSafe(address _receiver, bytes memory _calldata) internal override returns (uint256) {
         uint256 withdrawalId = arbsys.sendTxToL1(_receiver, _calldata);
-        console.log("Arbsys address is:");
-        console.logAddress(address(arbsys));
         emit L2ToL1TxCreated(withdrawalId);
         return withdrawalId;
     }
