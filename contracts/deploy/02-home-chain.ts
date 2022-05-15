@@ -20,7 +20,12 @@ const deployHomeGateway: DeployFunction = async (hre: HardhatRuntimeEnvironment)
     chainId === 31337
       ? await deployments.get("FastBridgeReceiverOnEthereum")
       : await hre.companionNetworks.foreign.deployments.get("FastBridgeReceiverOnEthereum");
-  const fastBridgeSender = await deploy("FastBridgeSenderToEthereum", {
+  
+  const fastBridgeSender = chainId === 31337 ? await deploy("FastBridgeSenderToEthereumMock", {
+    from: deployer,
+    args: [deployer, fastBridgeReceiver.address, ethers.constants.AddressZero],
+    log: true,
+  }) : await deploy("FastBridgeSenderToEthereum", {
     from: deployer,
     args: [deployer, fastBridgeReceiver.address, ethers.constants.AddressZero],
     log: true,
@@ -38,31 +43,41 @@ const deployHomeGateway: DeployFunction = async (hre: HardhatRuntimeEnvironment)
     log: true,
   }); // nonce+1
 
-  const fastSender = await hre.ethers
+  if (chainId == 31337) {
+    const fastSender = await hre.ethers
+    .getContractAt("FastBridgeSenderToEthereumMock", fastBridgeSender.address)
+    .then((contract) => contract.fastBridgeSender());
+  if (fastSender === ethers.constants.AddressZero) {
+    await execute("FastBridgeSenderToEthereumMock", { from: deployer, log: true }, "changeFastSender", homeGateway.address);
+  } 
+  } else {
+    const fastSender = await hre.ethers
     .getContractAt("FastBridgeSenderToEthereum", fastBridgeSender.address)
     .then((contract) => contract.fastBridgeSender());
   if (fastSender === ethers.constants.AddressZero) {
     await execute("FastBridgeSenderToEthereum", { from: deployer, log: true }, "changeFastSender", homeGateway.address);
   }
+  }
 
-  const outbox = await deploy("Outbox", {
-    from: deployer,
-    args: [fastBridgeSender.address],
-    log: true,
-  });
+  if (chainId == 31337) {
+    const outbox = await deploy("Outbox", {
+      from: deployer,
+      args: [fastBridgeSender.address],
+      log: true,
+    });
 
-  const bridge = await deploy("Bridge", {
-    from: deployer,
-    args: [outbox.address],
-    log: true,
-  });
+    const bridge = await deploy("Bridge", {
+      from: deployer,
+      args: [outbox.address],
+      log: true,
+    });
 
-  const inbox = await deploy("Inbox", {
-    from: deployer,
-    args: [bridge.address],
-    log: true,
-  });
-
+    const inbox = await deploy("Inbox", {
+      from: deployer,
+      args: [bridge.address],
+      log: true,
+    });
+  }
 };
 
 deployHomeGateway.tags = ["HomeChain", "HomeGateway"];

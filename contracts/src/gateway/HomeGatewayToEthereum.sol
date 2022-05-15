@@ -109,8 +109,6 @@ contract HomeGatewayToEthereum is IHomeGateway {
 
         bytes4 methodSelector = IForeignGateway.relayRule.selector;
         bytes memory data = abi.encodeWithSelector(methodSelector, disputeHash, _ruling, relayedData.relayer);
-        bytes memory data2 = abi.encodeWithSelector(methodSelector, disputeHash, 1, relayedData.relayer);
-        bytes32 newHash = keccak256(abi.encode(_disputeID, block.number, data2));
         fastbridge.sendFast(foreignGateway, data);
     }
 

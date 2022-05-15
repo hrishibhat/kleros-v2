@@ -55,7 +55,7 @@ describe("Demo pre-alpha1", function () {
     fastBridgeReceiver = <FastBridgeReceiverOnEthereum>await ethers.getContract("FastBridgeReceiverOnEthereum");
     foreignGateway = <ForeignGatewayOnEthereum>await ethers.getContract("ForeignGatewayOnEthereum");
     arbitrable = <ArbitrableExample>await ethers.getContract("ArbitrableExample");
-    fastBridgeSender = <FastBridgeSenderToEthereum>await ethers.getContract("FastBridgeSenderToEthereum");
+    fastBridgeSender = <FastBridgeSenderToEthereum>await ethers.getContract("FastBridgeSenderToEthereumMock");
     homeGateway = <HomeGatewayToEthereum>await ethers.getContract("HomeGatewayToEthereum");
     arbsys = <ArbSys>await ethers.getContract("ArbSys");
     inbox = <Inbox>await ethers.getContract("Inbox");
@@ -74,7 +74,7 @@ describe("Demo pre-alpha1", function () {
     expect(rn).to.equal(rnOld.add(1));
   });
 
-  it("Demo - Honest Claim - No Challenge", async () => {
+  it("Demo - Honest Claim - No Challenge - Bridger paid", async () => {
     const arbitrationCost = ONE_TENTH_ETH.mul(3);
     const [bridger, challenger] = await ethers.getSigners();
 
@@ -185,11 +185,10 @@ describe("Demo pre-alpha1", function () {
     expect(tx7).to.emit(arbitrable, "Ruling");
 
     const tx8 = await fastBridgeReceiver.withdrawClaimDeposit(ticketID);
-
   });
 
 
-  it("Demo - Honest Claim - Challenged", async () => {
+  it("Demo - Honest Claim - Challenged - Bridger Paid, Challenger deposit forfeited", async () => {
     const arbitrationCost = ONE_TENTH_ETH.mul(3);
     const [bridger, challenger] = await ethers.getSigners();
 
@@ -312,7 +311,7 @@ describe("Demo pre-alpha1", function () {
     await fastBridgeSender.set_arb(arbsys.address);
 
     let data = await ethers.utils.defaultAbiCoder.decode(["address", "bytes"], messageData);
-    let tx7 = await fastBridgeSender.connect(bridger).sendSafeFallback(ticketID, foreignGateway.address, data[1], { gasLimit: 1000000 }
+    let tx7 = await fastBridgeSender.connect(bridger).sendSafeFallbackMock(ticketID, foreignGateway.address, data[1], { gasLimit: 1000000 }
     );
     expect(tx7).to.emit(fastBridgeSender, "L2ToL1TxCreated");
     expect(tx7).to.emit(arbitrable, "Ruling");
@@ -321,7 +320,7 @@ describe("Demo pre-alpha1", function () {
 
   });
 
-  it("Demo - Dishonest Claim - Challenged", async () => {
+  it("Demo - Dishonest Claim - Challenged - Bridger deposit forfeited, Challenger paid", async () => {
     const arbitrationCost = ONE_TENTH_ETH.mul(3);
     const [bridger, challenger] = await ethers.getSigners();
 
@@ -361,7 +360,7 @@ describe("Demo pre-alpha1", function () {
     expect(tx).to.emit(foreignGateway, "DisputeCreation"); //.withArgs(disputeId, deployer.address);
     expect(tx).to.emit(foreignGateway, "OutgoingDispute"); //.withArgs(disputeId, deployer.address);
     console.log(`disputeId: ${disputeId}`);
-    let coreId = disputeId -1;
+    let coreId = disputeId - 1;
     // let events = await foreignGateway.queryFilter(OutgoingMessage);
 
 
@@ -449,10 +448,10 @@ describe("Demo pre-alpha1", function () {
 
     let data = await ethers.utils.defaultAbiCoder.decode(["address", "bytes"], fakeData);
 
-    await expect(fastBridgeSender.connect(bridger).sendSafeFallback(ticketID, foreignGateway.address, data[1], { gasLimit: 1000000 })).to.be.revertedWith('Invalid message for ticketID.');
-  
+    await expect(fastBridgeSender.connect(bridger).sendSafeFallbackMock(ticketID, foreignGateway.address, data[1], { gasLimit: 1000000 })).to.be.revertedWith('Invalid message for ticketID.');
+
     data = await ethers.utils.defaultAbiCoder.decode(["address", "bytes"], messageData);
-    let tx8 = await fastBridgeSender.connect(bridger).sendSafeFallback(ticketID, foreignGateway.address, data[1], { gasLimit: 1000000 }
+    let tx8 = await fastBridgeSender.connect(bridger).sendSafeFallbackMock(ticketID, foreignGateway.address, data[1], { gasLimit: 1000000 }
     );
     expect(tx8).to.emit(fastBridgeSender, "L2ToL1TxCreated");
     expect(tx8).to.emit(arbitrable, "Ruling");

@@ -50,7 +50,7 @@ const deployForeignGateway: DeployFunction = async (hre: HardhatRuntimeEnvironme
   let nonce;
   if (chainId === ForeignChains.HARDHAT) {
     nonce = await ethers.provider.getTransactionCount(deployer);
-    nonce += 3; // fastBridgeSender deploy tx will be the 6th after this, same network for both home/foreign.
+    nonce += 4; // HomeGatewayToEthereum deploy tx will be the 6th after this, same network for both home/foreign.
   } else {
     const homeChainProvider = new providers.JsonRpcProvider(homeNetworks[chainId].url);
     nonce = await homeChainProvider.getTransactionCount(deployer);
@@ -61,15 +61,16 @@ const deployForeignGateway: DeployFunction = async (hre: HardhatRuntimeEnvironme
   const bridgeAlpha = 5000;
   const homeChainIdAsBytes32 = hexZeroPad(homeChainId, 32);
 
-  const fastBridgeSenderAddress = getContractAddress(deployer, nonce);
-  console.log("calculated future FastSender for nonce %d: %s", nonce, fastBridgeSenderAddress);
-  
-  nonce += 1;
 
   const homeGatewayAddress = getContractAddress(deployer, nonce);
   console.log("calculated future HomeGatewayToEthereum address for nonce %d: %s", nonce, homeGatewayAddress);
+
+  nonce -= 1;
+
+  const fastBridgeSenderAddress = getContractAddress(deployer, nonce);
+  console.log("calculated future FastSender for nonce %d: %s", nonce, fastBridgeSenderAddress);
   
-  nonce += 4;
+  nonce += 5;
   const inboxAddress = getContractAddress(deployer, nonce);
   console.log("calculated future inboxAddress for nonce %d: %s", nonce, inboxAddress);
 

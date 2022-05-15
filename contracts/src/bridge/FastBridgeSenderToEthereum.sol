@@ -135,9 +135,11 @@ contract FastBridgeSenderToEthereum is SafeBridgeSenderToEthereum, IFastBridgeSe
         uint256 _blockNumber,
         address _receiver,
         bytes memory _calldata
-    ) internal view returns (bytes32 messageHash, bytes memory messageData) {
+    ) internal pure returns (bytes32 messageHash, bytes memory messageData) {
         // Encode the receiver address with the function signature + arguments i.e calldata
         messageData = abi.encode(_receiver, _calldata);
+
+        // Compute the hash over the message header (ticketID, blockNumber) and body (data).
         messageHash = keccak256(abi.encode(_ticketID, _blockNumber, messageData));
     }
 }
